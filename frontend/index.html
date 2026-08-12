@@ -1,0 +1,1452 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <title>Escrow Dashboard</title>
+
+        <meta name="escrow-contract-address" content="" />
+        <meta name="escrow-admin-address" content="" />
+
+        <link
+            href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+
+        <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
+
+        <script>
+            // Initialize config from config.json
+            window.configLoaded = fetch("./config.json")
+                .then(async (r) => {
+                    if (!r.ok) throw new Error("config missing");
+
+                    const config = await r.json();
+
+                    window.env = config;
+
+                    return config;
+                })
+                .catch(() => {
+                    window.env = {
+                        "escrow-contract-address": "",
+                        "escrow-admin-address": "",
+                    };
+
+                    return window.env;
+                });
+        </script>
+
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: "Poppins", sans-serif;
+            }
+
+            body {
+                background: #0b1120;
+                color: #fff;
+                display: flex;
+                min-height: 100vh;
+                overflow-x: hidden;
+            }
+
+            .sidebar {
+                width: 240px;
+                background: rgba(20, 25, 40, 0.95);
+                backdrop-filter: blur(20px);
+                border-right: 1px solid rgba(255, 255, 255, 0.08);
+                padding: 30px 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .logo {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 30px;
+                background: linear-gradient(90deg, #7c5cff, #00d4ff);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .sidebar a {
+                padding: 14px 18px;
+                border-radius: 12px;
+                text-decoration: none;
+                color: #bfc7d5;
+                cursor: pointer;
+                transition: 0.3s;
+            }
+
+            .sidebar a:hover,
+            .sidebar a.active {
+                background: linear-gradient(90deg, #6d4dff, #00bfff);
+                color: #fff;
+                transform: translateX(4px);
+            }
+
+            .main {
+                flex: 1;
+                padding: 30px;
+                width: calc(100vw - 240px);
+                overflow-x: hidden;
+            }
+
+            header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                flex-wrap: wrap;
+                gap: 20px;
+                margin-bottom: 35px;
+            }
+
+            header h1 {
+                font-size: 34px;
+                font-weight: 600;
+            }
+
+            .wallet {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+
+            #walletAddress,
+            #connectStatus {
+                font-size: 14px;
+                color: #9ca3af;
+                display: block;
+            }
+
+            #connectStatus {
+                margin-top: 4px;
+            }
+
+            button {
+                background: linear-gradient(90deg, #7c5cff, #00d4ff);
+                border: none;
+                color: white;
+                padding: 12px 22px;
+                border-radius: 10px;
+                cursor: pointer;
+                font-size: 15px;
+                font-weight: 600;
+                transition: 0.3s;
+            }
+
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 0 25px rgba(0, 212, 255, 0.35);
+            }
+
+            .stats {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 20px;
+                margin-bottom: 35px;
+            }
+
+            .card {
+                background: rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(18px);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 18px;
+                padding: 25px;
+                transition: 0.3s;
+            }
+
+            .card:hover {
+                transform: translateY(-6px);
+                border-color: #7c5cff;
+            }
+
+            .card h2 {
+                font-size: 36px;
+                margin-bottom: 8px;
+            }
+
+            .card p {
+                color: #aab3c5;
+            }
+
+            .create,
+            .tableSection,
+            .activity {
+                width: 100%;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                backdrop-filter: blur(20px);
+                padding: 25px;
+                border-radius: 18px;
+                margin-bottom: 30px;
+            }
+
+            .create h2,
+            .tableSection h2,
+            .activity h2 {
+                margin-bottom: 20px;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 18px;
+            }
+
+            .grid textarea {
+                grid-column: 1/-1;
+                height: 120px;
+                resize: none;
+            }
+
+            input,
+            textarea {
+                width: 100%;
+                padding: 14px;
+                background: #131c2f;
+                border: 1px solid #293247;
+                border-radius: 12px;
+                color: white;
+                outline: none;
+                transition: 0.3s;
+            }
+
+            input:focus,
+            textarea:focus {
+                border-color: #6d4dff;
+                box-shadow: 0 0 15px rgba(124, 92, 255, 0.25);
+            }
+
+            .tableHeader {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                gap: 20px;
+            }
+
+            #search {
+                width: 250px;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th {
+                text-align: left;
+                padding: 15px;
+                color: #b8c0d4;
+                font-weight: 600;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            td {
+                padding: 18px 15px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            }
+
+            tr:hover {
+                background: rgba(255, 255, 255, 0.03);
+            }
+
+            .badge {
+                padding: 7px 14px;
+                border-radius: 50px;
+                font-size: 12px;
+                font-weight: 600;
+                display: inline-block;
+            }
+
+            .badge.active {
+                background: #1d4ed8;
+            }
+
+            .badge.completed {
+                background: #16a34a;
+            }
+
+            .badge.disputed {
+                background: #dc2626;
+            }
+
+            .badge.pending {
+                background: #ca8a04;
+            }
+
+            .activityItem {
+                padding: 15px;
+                background: #131c2f;
+                border-radius: 10px;
+                margin-bottom: 12px;
+                transition: 0.3s;
+            }
+
+            .activityItem:hover {
+                transform: translateX(5px);
+                background: #1a2742;
+            }
+
+            ::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: #5b5b5b;
+                border-radius: 20px;
+            }
+
+            @media (max-width: 900px) {
+                body {
+                    flex-direction: column;
+                }
+
+                .sidebar {
+                    width: 100%;
+                    flex-direction: row;
+                    overflow: auto;
+                    padding: 15px;
+                }
+
+                .logo {
+                    display: none;
+                }
+
+                .main {
+                    padding: 20px;
+                    width: 100%;
+                }
+
+                header {
+                    flex-direction: column;
+                    gap: 20px;
+                    align-items: flex-start;
+                }
+
+                .tableSection {
+                    overflow: auto;
+                }
+
+                table {
+                    min-width: 700px;
+                }
+
+                #search {
+                    width: 100%;
+                }
+            }
+            @media (max-width: 1200px) {
+                .stats {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+
+                .grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .create,
+                .tableSection,
+                .activity {
+                    width: 100%;
+                }
+            }
+        </style>
+    </head>
+
+    <body>
+        <div
+            id="loader"
+            style="
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: #0b1120cc;
+                z-index: 99999;
+                align-items: center;
+                justify-content: center;
+                font-size: 25px;
+            "
+        >
+            Processing Transaction...
+        </div>
+
+        <div class="sidebar">
+            <div class="logo">ESCROW</div>
+
+            <a class="nav active" data-tab="dashboardTab">Dashboard</a>
+            <a class="nav" data-tab="createTab">Create Escrow</a>
+            <a class="nav" data-tab="escrowsTab">My Escrows</a>
+            <a class="nav" data-tab="transactionsTab">Transactions</a>
+            <a class="nav" data-tab="analyticsTab">Analytics</a>
+            <a class="nav" data-tab="settingsTab">Settings</a>
+        </div>
+
+        <div class="main">
+            <header>
+                <h1>Escrow Dashboard</h1>
+
+                <div class="wallet">
+                    <button id="connectBtn">Connect Wallet</button>
+
+                    <div>
+                        <span id="walletAddress">Not Connected</span>
+                        <span id="connectStatus">Status: Disconnected</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- DASHBOARD TAB -->
+            <div id="dashboardTab" style="display: block">
+                <section class="stats">
+                    <div class="card">
+                        <h2 id="totalEscrows">0</h2>
+                        <p>Total Escrows</p>
+                    </div>
+
+                    <div class="card">
+                        <h2 id="activeEscrows">0</h2>
+                        <p>Active</p>
+                    </div>
+
+                    <div class="card">
+                        <h2 id="completedEscrows">0</h2>
+                        <p>Completed</p>
+                    </div>
+
+                    <div class="card">
+                        <h2 id="disputedEscrows">0</h2>
+                        <p>Disputed</p>
+                    </div>
+                </section>
+
+                <section class="activity">
+                    <h2>Recent Activity</h2>
+                    <div id="activityFeed">
+                        <div class="activityItem">Loading activity...</div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- CREATE ESCROW TAB -->
+            <div id="createTab" style="display: none">
+                <section class="create">
+                    <h2>Create Escrow</h2>
+
+                    <div class="grid">
+                        <input id="seller" placeholder="Seller Address" />
+                        <input id="arbitrator" placeholder="Arbitrator Address" />
+                        <input id="amount" placeholder="Amount" />
+                        <textarea id="description" placeholder="Description"></textarea>
+                    </div>
+
+                    <button id="createBtn">Create Escrow</button>
+                </section>
+            </div>
+
+            <!-- MY ESCROWS TAB -->
+            <div id="escrowsTab" style="display: none">
+                <section class="create">
+                    <h2>User Actions</h2>
+
+                    <div class="grid">
+                        <input id="selectedEscrowId" placeholder="Escrow ID" />
+                        <input id="resolveWinnerAddress" placeholder="Winner Address for resolve" />
+
+                        <button onclick="fundSelectedEscrow()">Fund</button>
+                        <button onclick="acceptSelectedEscrow()">Accept</button>
+                        <button onclick="deliverSelectedEscrow()">Deliver</button>
+                        <button onclick="approveSelectedEscrow()">Approve</button>
+                        <button onclick="cancelSelectedEscrow()">Cancel</button>
+                        <button onclick="rejectSelectedEscrow()">Reject</button>
+                        <button onclick="disputeSelectedEscrow()">Dispute</button>
+                        <button onclick="resolveSelectedEscrow()">Resolve</button>
+                        <button onclick="withdrawSelectedEscrow()">Withdraw</button>
+                    </div>
+                </section>
+
+                <section class="tableSection">
+                    <div class="tableHeader">
+                        <h2>My Escrows</h2>
+                        <input
+                            id="search"
+                            type="text"
+                            placeholder="Search by ID, seller, buyer, or status"
+                        />
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Seller</th>
+                                <th>Buyer</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="escrowTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #9ca3af">
+                                    No escrows yet. Connect your wallet to load them.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+            <!-- TRANSACTIONS TAB -->
+            <div id="transactionsTab" style="display: none">
+                <section class="tableSection">
+                    <h2>Transaction History</h2>
+
+                    <div id="transactionList">
+                        <div class="activityItem">No transactions yet.</div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ANALYTICS TAB -->
+            <div id="analyticsTab" style="display: none">
+                <section class="create">
+                    <h2>Contract Analytics</h2>
+
+                    <div class="grid">
+                        <div>
+                            <p style="margin-bottom: 8px">Locked Funds</p>
+                            <input id="lockedFunds" disabled />
+                        </div>
+                        <div>
+                            <p style="margin-bottom: 8px">Accumulated Fees</p>
+                            <input id="platformFees" disabled />
+                        </div>
+                        <div>
+                            <p style="margin-bottom: 8px">Contract Status</p>
+                            <input id="contractStatus" disabled />
+                        </div>
+                        <div>
+                            <p style="margin-bottom: 8px">Current Platform Fee</p>
+                            <input id="currentFeeView" disabled />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="create" id="analyticsAdminActions">
+                    <h2>Admin Actions</h2>
+
+                    <div class="grid">
+                        <input
+                            id="receiverAddress"
+                            placeholder="Receiver Address (for withdraw fees)"
+                        />
+                        <input id="newFeeValue" placeholder="New Fee (e.g. 100)" />
+
+                        <button onclick="withdrawFeesSelected()">Withdraw Fees</button>
+                        <button onclick="proposeFeeSelected()">Propose Fee</button>
+                        <button onclick="executeFeeSelected()">Execute Fee</button>
+                        <button onclick="pauseSelected()">Pause</button>
+                        <button onclick="unpauseSelected()">Unpause</button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- SETTINGS TAB -->
+            <div id="settingsTab" style="display: none">
+                <section class="create">
+                    <h2>Contract Settings</h2>
+
+                    <div class="grid">
+                        <div>
+                            <p style="margin-bottom: 8px">Contract Address</p>
+                            <input id="contractAddressView" disabled />
+                        </div>
+                        <div>
+                            <p style="margin-bottom: 8px">Owner Address</p>
+                            <input id="ownerAddressView" disabled />
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- ADMIN ACTIONS SECTION (Hidden by default) -->
+        <div
+            id="adminActions"
+            style="
+                display: none;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: rgba(20, 25, 40, 0.95);
+                padding: 20px;
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                z-index: 1000;
+            "
+        >
+            <p style="font-size: 12px; color: #7c5cff">Admin Mode Enabled</p>
+        </div>
+
+        <!-- Escrow Details Modal -->
+        <div
+            id="escrowModal"
+            style="
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+            "
+        >
+            <div
+                style="
+                    background: #131c2f;
+                    padding: 30px;
+                    border-radius: 20px;
+                    width: 400px;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                "
+            >
+                <h2>Escrow Details</h2>
+
+                <br />
+
+                <p id="modalEscrowId"></p>
+                <p id="modalBuyer"></p>
+                <p id="modalSeller"></p>
+                <p id="modalAmount"></p>
+                <p id="modalStatus"></p>
+
+                <br />
+
+                <button onclick="closeEscrowModal()">Close</button>
+            </div>
+        </div>
+
+        <script>
+            let provider;
+            let signer;
+            let account;
+            let isOwner = false;
+
+            function showLoader() {
+                document.getElementById("loader").style.display = "flex";
+            }
+
+            function hideLoader() {
+                document.getElementById("loader").style.display = "none";
+            }
+
+            function getConfigValue(name, fallback = "") {
+                const meta = document.querySelector(`meta[name="${name}"]`);
+                const fromMeta = meta?.content?.trim();
+                const fromWindow = window?.env?.[name] || window?.[name];
+
+                return fromMeta || fromWindow || fallback;
+            }
+
+            function listenEvents() {
+                if (!window.escrowContract) return;
+
+                window.escrowContract.on(
+                    "EscrowCreated",
+                    (id, buyer, seller, arbitrator, amount) => {
+                        toast("New Escrow Created #" + id);
+                        loadEscrows();
+                    },
+                );
+
+                window.escrowContract.on("PaymentReleased", (id) => {
+                    toast("Payment Released #" + id);
+                    loadEscrows();
+                });
+
+                window.escrowContract.on("DisputeRaised", (id) => {
+                    toast("Dispute Raised #" + id);
+                });
+            }
+
+            function getContractAddress() {
+                return getConfigValue("escrow-contract-address").trim();
+            }
+
+            function getAdminAddress() {
+                return getConfigValue("escrow-admin-address").trim();
+            }
+
+            function setConnectStatus(text, color = "#9ca3af") {
+                const statusEl = document.getElementById("connectStatus");
+                if (statusEl) {
+                    statusEl.innerText = text;
+                    statusEl.style.color = color;
+                }
+            }
+
+            function updateAdminVisibility() {
+                const adminSection = document.getElementById("adminActions");
+                const analyticsAdminSection = document.getElementById("analyticsAdminActions");
+
+                if (adminSection) {
+                    adminSection.style.display = isOwner ? "block" : "none";
+                }
+
+                if (analyticsAdminSection) {
+                    analyticsAdminSection.style.display = isOwner ? "block" : "none";
+                }
+
+                setConnectStatus(
+                    isOwner ? "Connected as Admin" : account ? "Connected" : "Not connected",
+                    isOwner ? "#22c55e" : "#9ca3af",
+                );
+            }
+
+            async function checkOwnerAccess() {
+                if (!window.escrowContract || !account) {
+                    isOwner = false;
+                    updateAdminVisibility();
+                    return;
+                }
+
+                try {
+                    const owner = await window.escrowContract.owner();
+                    const configuredAdmin = getAdminAddress();
+
+                    isOwner = configuredAdmin
+                        ? account.toLowerCase() === configuredAdmin.toLowerCase()
+                        : owner.toLowerCase() === account.toLowerCase();
+                } catch (e) {
+                    isOwner = false;
+                    console.error("Could not verify owner", e);
+                }
+
+                updateAdminVisibility();
+            }
+
+            let CONTRACT_ADDRESS = "";
+
+            const escrows = [];
+
+            const ABI = [
+                "function owner() view returns(address)",
+                "function paused() view returns(bool)",
+                "function platformFee() view returns(uint96)",
+                "function accumulatedFees() view returns(uint256)",
+                "function totalLockedFunds() view returns(uint256)",
+                "function getBuyerEscrows(address) view returns(uint256[])",
+                "function getSellerEscrows(address) view returns(uint256[])",
+                "function getEscrow(uint256) view returns(tuple(uint256 id,address buyer,address seller,address arbitrator,uint256 amount,uint256 deadline,uint256 createdAt,uint96 platformFee,uint8 status,bool exists))",
+                "function createEscrow(address seller,address arbitrator,uint256 amount,uint256 deadline)",
+                "function fundEscrow(uint256 escrowId) payable",
+                "function acceptEscrow(uint256 escrowId)",
+                "function markDelivered(uint256 escrowId)",
+                "function approvePayment(uint256 escrowId)",
+                "function cancelEscrow(uint256 escrowId)",
+                "function rejectEscrow(uint256 escrowId)",
+                "function raiseDispute(uint256 escrowId)",
+                "function resolveDispute(uint256 escrowId,address winner)",
+                "function withdraw()",
+                "function withdrawFees(address receiver)",
+                "function proposePlatformFee(uint96 newFee)",
+                "function executePlatformFee()",
+                "function pause()",
+                "function unpause()",
+                "event EscrowCreated(uint256 indexed escrowId,address indexed buyer,address indexed seller,address arbitrator,uint256 amount,uint256 deadline)",
+                "event EscrowFunded(uint256 indexed escrowId,address indexed buyer,uint256 amount)",
+                "event EscrowAccepted(uint256 indexed escrowId,address indexed seller)",
+                "event WorkDelivered(uint256 indexed escrowId,address indexed seller)",
+                "event PaymentReleased(uint256 indexed escrowId,address indexed seller,uint256 sellerAmount,uint256 platformFee)",
+                "event DisputeRaised(uint256 indexed escrowId,address indexed raisedBy)",
+                "event DisputeResolved(uint256 indexed escrowId,address indexed winner,uint256 amount)",
+            ];
+
+            function toast(message) {
+                const div = document.createElement("div");
+                div.innerText = message;
+                div.style.position = "fixed";
+                div.style.right = "30px";
+                div.style.top = "30px";
+                div.style.padding = "15px 20px";
+                div.style.background = "#7c5cff";
+                div.style.borderRadius = "10px";
+                div.style.boxShadow = "0 10px 30px rgba(0,0,0,.4)";
+                div.style.zIndex = 9999;
+                document.body.appendChild(div);
+                setTimeout(() => {
+                    div.remove();
+                }, 2500);
+            }
+
+            async function checkNetwork() {
+                const network = await provider.getNetwork();
+                const chainId = Number(network.chainId);
+                const supported = [31337, 11155111, 84532];
+
+                if (!supported.includes(chainId)) {
+                    toast("Wrong network. Switch network.");
+                    return false;
+                }
+
+                return true;
+            }
+
+            function validateAddress(address) {
+                return ethers.isAddress(address);
+            }
+
+            async function connectWallet() {
+                try {
+                    if (!window.ethereum) {
+                        toast("Install MetaMask");
+                        return;
+                    }
+
+                    await window.configLoaded;
+                    CONTRACT_ADDRESS = getContractAddress();
+
+                    if (!validateAddress(CONTRACT_ADDRESS)) {
+                        toast("Invalid contract address");
+                        return;
+                    }
+
+                    if (!CONTRACT_ADDRESS) {
+                        toast("Set escrow contract address in config.json or env");
+                        return;
+                    }
+
+                    provider = new ethers.BrowserProvider(window.ethereum);
+
+                    if (!(await checkNetwork())) {
+                        return;
+                    }
+
+                    await provider.send("eth_requestAccounts", []);
+
+                    signer = await provider.getSigner();
+
+                    account = await signer.getAddress();
+
+                    window.escrowContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+                    document.getElementById("walletAddress").innerText =
+                        account.slice(0, 6) + "..." + account.slice(-4);
+                    setConnectStatus("Connected", "#22c55e");
+
+                    document.getElementById("connectBtn").innerText = "Connected";
+
+                    toast("Wallet Connected");
+
+                    await loadEscrows();
+                    await loadAnalytics();
+                    await loadTransactions();
+                    await checkOwnerAccess();
+                    listenEvents();
+                } catch (e) {
+                    console.error("Error connecting wallet", e);
+                    toast("Error connecting wallet: " + (e?.message || "Unknown error"));
+                }
+            }
+
+            async function loadAnalytics() {
+                if (!window.escrowContract) return;
+
+                try {
+                    const locked = await window.escrowContract.totalLockedFunds();
+                    const fees = await window.escrowContract.accumulatedFees();
+                    const owner = await window.escrowContract.owner();
+                    const fee = await window.escrowContract.platformFee();
+                    const paused = await window.escrowContract.paused();
+
+                    document.getElementById("lockedFunds").value =
+                        ethers.formatEther(locked) + " ETH";
+                    document.getElementById("platformFees").value =
+                        ethers.formatEther(fees) + " ETH";
+                    document.getElementById("contractStatus").value = paused ? "Paused" : "Active";
+                    document.getElementById("contractAddressView").value = CONTRACT_ADDRESS;
+                    document.getElementById("ownerAddressView").value = owner;
+                    document.getElementById("currentFeeView").value = fee.toString();
+                } catch (e) {
+                    console.error("Analytics error", e);
+                }
+            }
+
+            async function autoConnect() {
+                if (!window.ethereum) return;
+
+                const accounts = await window.ethereum.request({
+                    method: "eth_accounts",
+                });
+
+                if (accounts.length) {
+                    await connectWallet();
+                }
+            }
+
+            window.addEventListener("load", autoConnect);
+
+            document.getElementById("connectBtn").onclick = connectWallet;
+
+            function getSelectedEscrowId(fieldId = "selectedEscrowId") {
+                const field = document.getElementById(fieldId);
+                if (!field) {
+                    toast("Missing escrow ID field: " + fieldId);
+                    return null;
+                }
+                const value = field.value.trim();
+                if (!value) {
+                    toast("Enter an escrow ID in " + field.placeholder);
+                    return null;
+                }
+                const id = Number(value);
+                if (Number.isNaN(id)) {
+                    toast("Escrow ID must be a number");
+                    return null;
+                }
+                return id;
+            }
+
+            async function runAction(actionName, actionFn) {
+                if (!window.escrowContract) {
+                    toast("Connect wallet first");
+                    return;
+                }
+
+                try {
+                    toast(actionName + " processing...");
+                    showLoader();
+
+                    const tx = await actionFn();
+
+                    if (tx?.wait) {
+                        await tx.wait();
+                    }
+
+                    await loadEscrows();
+                    await loadTransactions();
+                    await loadAnalytics();
+
+                    hideLoader();
+                    toast(actionName + " completed");
+                } catch (e) {
+                    hideLoader();
+                    console.error(actionName, e);
+                    toast(e.message);
+                }
+            }
+
+            async function fundSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+                const escrow = escrows.find((x) => x.id === id);
+                if (!escrow) {
+                    toast("Escrow not loaded yet");
+                    return;
+                }
+                await runAction("Fund", async () =>
+                    window.escrowContract.fundEscrow(id, { value: escrow.amountWei }),
+                );
+            }
+
+            async function acceptSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+
+                const escrow = escrows.find((x) => x.id === id);
+                if (!escrow) {
+                    toast("Escrow not found");
+                    return;
+                }
+
+                if (escrow.seller.toLowerCase() !== account.toLowerCase()) {
+                    toast("Only the seller can accept this escrow");
+                    return;
+                }
+
+                await runAction("Accept", async () => window.escrowContract.acceptEscrow(id));
+            }
+
+            async function deliverSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+                await runAction("Deliver", async () => window.escrowContract.markDelivered(id));
+            }
+
+            async function approveSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+                await runAction("Approve", async () => window.escrowContract.approvePayment(id));
+            }
+
+            async function cancelSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+                await runAction("Cancel", async () => window.escrowContract.cancelEscrow(id));
+            }
+
+            async function rejectSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+                await runAction("Reject", async () => window.escrowContract.rejectEscrow(id));
+            }
+
+            async function disputeSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+                await runAction("Dispute", async () => window.escrowContract.raiseDispute(id));
+            }
+
+            async function resolveSelectedEscrow() {
+                const id = getSelectedEscrowId();
+                if (id === null) return;
+                const winner = document.getElementById("resolveWinnerAddress").value.trim();
+                if (!winner) {
+                    toast("Enter the winner address for resolve");
+                    return;
+                }
+                await runAction("Resolve", async () =>
+                    window.escrowContract.resolveDispute(id, winner),
+                );
+            }
+
+            async function withdrawSelectedEscrow() {
+                await runAction("Withdraw", async () => window.escrowContract.withdraw());
+            }
+
+            async function withdrawFeesSelected() {
+                const receiver = document.getElementById("receiverAddress").value.trim();
+                if (!receiver) {
+                    toast("Enter receiver address");
+                    return;
+                }
+                await runAction("Withdraw fees", async () =>
+                    window.escrowContract.withdrawFees(receiver),
+                );
+            }
+
+            async function proposeFeeSelected() {
+                const feeValue = document.getElementById("newFeeValue").value.trim();
+                if (!feeValue) {
+                    toast("Enter a platform fee value");
+                    return;
+                }
+                await runAction("Propose fee", async () =>
+                    window.escrowContract.proposePlatformFee(Number(feeValue)),
+                );
+            }
+
+            async function executeFeeSelected() {
+                await runAction("Execute fee", async () =>
+                    window.escrowContract.executePlatformFee(),
+                );
+            }
+
+            async function pauseSelected() {
+                await runAction("Pause", async () => window.escrowContract.pause());
+            }
+
+            async function unpauseSelected() {
+                await runAction("Unpause", async () => window.escrowContract.unpause());
+            }
+
+            const STATUS_MAP = {
+                0: "CREATED",
+                1: "FUNDED",
+                2: "ACCEPTED",
+                3: "DELIVERED",
+                4: "COMPLETED",
+                5: "CANCELLED",
+                6: "DISPUTED",
+                7: "RESOLVED",
+            };
+
+            function badge(status) {
+                if (["CREATED", "FUNDED", "ACCEPTED", "DELIVERED"].includes(status))
+                    return `<span class="badge active">${status}</span>`;
+                if (["COMPLETED", "RESOLVED"].includes(status))
+                    return `<span class="badge completed">${status}</span>`;
+                if (status === "DISPUTED") return `<span class="badge disputed">${status}</span>`;
+                return `<span class="badge pending">${status}</span>`;
+            }
+
+            function renderTable(data) {
+                const tbody = document.getElementById("escrowTable");
+                tbody.innerHTML = "";
+                if (!data.length) {
+                    tbody.innerHTML =
+                        '<tr><td colspan="6" style="text-align:center;color:#9ca3af;">No escrows found.</td></tr>';
+                    return;
+                }
+                data.forEach((e) => {
+                    tbody.innerHTML += `
+      <tr>
+        <td>${e.id}</td>
+        <td>${e.seller.slice(0, 6)}...${e.seller.slice(-4)}</td>
+        <td>${e.buyer.slice(0, 6)}...${e.buyer.slice(-4)}</td>
+        <td>${e.amount}</td>
+        <td>${badge(e.status)}</td>
+        <td><button onclick="viewEscrow(${e.id})">View</button></td>
+      </tr>`;
+                });
+            }
+
+            function updateStats() {
+                document.getElementById("totalEscrows").innerText = escrows.length;
+                document.getElementById("activeEscrows").innerText = escrows.filter((x) =>
+                    ["CREATED", "FUNDED", "ACCEPTED", "DELIVERED"].includes(x.status),
+                ).length;
+                document.getElementById("completedEscrows").innerText = escrows.filter((x) =>
+                    ["COMPLETED", "RESOLVED"].includes(x.status),
+                ).length;
+                document.getElementById("disputedEscrows").innerText = escrows.filter(
+                    (x) => x.status === "DISPUTED",
+                ).length;
+            }
+
+            function viewEscrow(id) {
+                const escrow = escrows.find((x) => x.id === id);
+
+                if (!escrow) {
+                    toast("Escrow not found");
+                    return;
+                }
+
+                document.getElementById("selectedEscrowId").value = escrow.id;
+                document.getElementById("modalEscrowId").innerText = "ID: " + escrow.id;
+                document.getElementById("modalBuyer").innerText = "Buyer: " + escrow.buyer;
+                document.getElementById("modalSeller").innerText = "Seller: " + escrow.seller;
+                document.getElementById("modalAmount").innerText = "Amount: " + escrow.amount;
+                document.getElementById("modalStatus").innerText = "Status: " + escrow.status;
+                document.getElementById("escrowModal").style.display = "flex";
+            }
+
+            function closeEscrowModal() {
+                document.getElementById("escrowModal").style.display = "none";
+            }
+
+            function renderActivity(items) {
+                const feed = document.getElementById("activityFeed");
+                feed.innerHTML = "";
+                if (!items.length) {
+                    feed.innerHTML = '<div class="activityItem">No recent activity yet.</div>';
+                    return;
+                }
+                items.forEach((item) => {
+                    const div = document.createElement("div");
+                    div.className = "activityItem";
+                    div.innerText = item;
+                    feed.appendChild(div);
+                });
+            }
+
+            async function loadTransactions() {
+                if (!window.escrowContract || !account) return;
+
+                try {
+                    const latest = await provider.getBlockNumber();
+                    const fromBlock = Math.max(0, latest - 5000);
+
+                    const createdEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.EscrowCreated(),
+                        fromBlock,
+                        latest,
+                    );
+                    const fundedEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.EscrowFunded(),
+                        fromBlock,
+                        latest,
+                    );
+                    const acceptedEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.EscrowAccepted(),
+                        fromBlock,
+                        latest,
+                    );
+                    const deliveredEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.WorkDelivered(),
+                        fromBlock,
+                        latest,
+                    );
+                    const releasedEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.PaymentReleased(),
+                        fromBlock,
+                        latest,
+                    );
+
+                    const allEvents = [
+                        ...createdEvents,
+                        ...fundedEvents,
+                        ...acceptedEvents,
+                        ...deliveredEvents,
+                        ...releasedEvents,
+                    ];
+                    const events = allEvents.filter((event) => {
+    const args = event.args || [];
+    const eventName = event.fragment?.name;
+    
+    // Different events have different argument orders
+    if(eventName === "EscrowCreated"){
+        const [escrowId, buyer, seller, arbitrator] = args;
+        return buyer?.toLowerCase() === account.toLowerCase() || 
+               seller?.toLowerCase() === account.toLowerCase() ||
+               arbitrator?.toLowerCase() === account.toLowerCase();
+    }
+    else if(eventName === "EscrowFunded"){
+        const [escrowId, buyer] = args;
+        return buyer?.toLowerCase() === account.toLowerCase();
+    }
+    else if(eventName === "EscrowAccepted"){
+        const [escrowId, seller] = args;
+        return seller?.toLowerCase() === account.toLowerCase();
+    }
+    else if(eventName === "WorkDelivered"){
+        const [escrowId, seller] = args;
+        return seller?.toLowerCase() === account.toLowerCase();
+    }
+    else if(eventName === "PaymentReleased"){
+        const [escrowId, seller] = args;
+        return seller?.toLowerCase() === account.toLowerCase();
+    }
+    
+    return false;
+});
+
+                    const list = document.getElementById("transactionList");
+
+                    list.innerHTML = "";
+
+                    if (events.length === 0) {
+                        list.innerHTML = `<div class="activityItem">No transactions found</div>`;
+                        return;
+                    }
+
+                    events
+                        .reverse()
+                        .slice(0, 10)
+                        .forEach((event) => {
+                            const div = document.createElement("div");
+                            div.className = "activityItem";
+                            div.innerText = `${event.fragment.name} | Block ${event.blockNumber}`;
+                            list.appendChild(div);
+                        });
+                } catch (e) {
+                    console.error("Transaction loading error", e);
+                }
+            }
+
+            async function loadActivity() {
+                if (!window.escrowContract || !account) {
+                    renderActivity([]);
+                    return;
+                }
+                try {
+                    const latestBlock = await provider.getBlockNumber();
+                    const fromBlock = Math.max(0, latestBlock - 5000);
+                    const createdEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.EscrowCreated(),
+                        fromBlock,
+                    );
+                    const paymentEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.PaymentReleased(),
+                        fromBlock,
+                    );
+                    const disputeEvents = await window.escrowContract.queryFilter(
+                        window.escrowContract.filters.DisputeRaised(),
+                        fromBlock,
+                    );
+                    const items = [];
+                    for (const event of [...createdEvents, ...paymentEvents, ...disputeEvents]) {
+                        const name = event.fragment?.name || "";
+                        const args = event.args || [];
+                        if (name === "EscrowCreated") {
+                            const [escrowId, buyer, seller] = args;
+                            if (
+                                buyer?.toLowerCase() === account.toLowerCase() ||
+                                seller?.toLowerCase() === account.toLowerCase()
+                            ) {
+                                items.push(`Escrow #${escrowId.toString()} created`);
+                            }
+                        } else if (name === "PaymentReleased") {
+                            const [escrowId, seller] = args;
+                            if (seller?.toLowerCase() === account.toLowerCase()) {
+                                items.push(`Escrow #${escrowId.toString()} payment released`);
+                            }
+                        } else if (name === "DisputeRaised") {
+                            const [escrowId, raisedBy] = args;
+                            if (raisedBy?.toLowerCase() === account.toLowerCase()) {
+                                items.push(`Escrow #${escrowId.toString()} dispute raised`);
+                            }
+                        }
+                    }
+                    renderActivity(items.slice(0, 5));
+                } catch (e) {
+                    console.error("Error loading activity:", e);
+                    renderActivity([]);
+                }
+            }
+
+            async function loadEscrows() {
+                if (!window.escrowContract || !account) {
+                    return;
+                }
+
+                try {
+                    escrows.length = 0;
+
+                    const buyerIds = await window.escrowContract.getBuyerEscrows(account);
+                    const sellerIds = await window.escrowContract.getSellerEscrows(account);
+
+                    const allIds = [
+                        ...new Set(
+                            [...(buyerIds || []), ...(sellerIds || [])].map((id) => Number(id)),
+                        ),
+                    ];
+
+                    const escrowDetails = await Promise.all(
+                        allIds.map((id) => window.escrowContract.getEscrow(id)),
+                    );
+
+                    escrowDetails.forEach((escrowData) => {
+                        if (!escrowData.exists) return;
+
+                        // Verify escrow belongs to current account
+                        if (
+                            escrowData.buyer.toLowerCase() !== account.toLowerCase() &&
+                            escrowData.seller.toLowerCase() !== account.toLowerCase()
+                        ) {
+                            return;
+                        }
+
+                        escrows.push({
+                            id: Number(escrowData.id),
+                            seller: escrowData.seller,
+                            buyer: escrowData.buyer,
+                            amount: ethers.formatEther(escrowData.amount) + " ETH",
+                            amountWei: escrowData.amount,
+                            status: STATUS_MAP[escrowData.status] || "UNKNOWN",
+                        });
+                    });
+
+                    updateStats();
+                    renderTable(escrows);
+                    await loadActivity();
+                } catch (e) {
+                    console.error("Error loading escrows:", e);
+                    toast("Error loading escrows");
+                }
+            }
+
+            document.getElementById("search").addEventListener("input", (e) => {
+                const value = e.target.value.toLowerCase();
+                const filtered = escrows.filter(
+                    (x) =>
+                        String(x.id).includes(value) ||
+                        x.seller.toLowerCase().includes(value) ||
+                        x.buyer.toLowerCase().includes(value) ||
+                        x.status.toLowerCase().includes(value),
+                );
+                renderTable(filtered);
+            });
+
+            document.getElementById("createBtn").onclick = async () => {
+                const seller = document.getElementById("seller").value.trim();
+                const arbitrator = document.getElementById("arbitrator").value.trim();
+                const amount = document.getElementById("amount").value.trim();
+
+                if (!seller || !arbitrator || !amount) {
+                    toast("Fill seller, arbitrator and amount");
+                    return;
+                }
+                
+
+                if (!window.escrowContract) {
+                    toast("Connect wallet first");
+                    return;
+                }
+
+                try {
+                    const deadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+                    toast("Creating escrow...");
+                    showLoader();
+
+                    const tx = await window.escrowContract.createEscrow(
+                        seller,
+                        arbitrator,
+                        ethers.parseUnits(amount, 18),
+                        deadline,
+                    );
+
+                    await tx.wait();
+
+                    document.getElementById("seller").value = "";
+                    document.getElementById("arbitrator").value = "";
+                    document.getElementById("amount").value = "";
+                    document.getElementById("description").value = "";
+
+                    await loadEscrows();
+                    hideLoader();
+                    toast("Escrow Created!");
+                } catch (e) {
+                    hideLoader();
+                    console.error(e);
+                    toast("Error: " + (e?.message || "Create failed"));
+                }
+            };
+
+            // Sidebar Navigation
+            const sidebarLinks = document.querySelectorAll(".sidebar a.nav");
+
+            sidebarLinks.forEach((link) => {
+                link.onclick = () => {
+                    sidebarLinks.forEach((l) => l.classList.remove("active"));
+                    link.classList.add("active");
+
+                    document.querySelectorAll(".main > div[id$='Tab']").forEach((tab) => {
+                        tab.style.display = "none";
+                    });
+
+                    const target = document.getElementById(link.dataset.tab);
+                    if (target) target.style.display = "block";
+                };
+            });
+
+            // MetaMask Events
+            if (window.ethereum) {
+                window.ethereum.on("accountsChanged", async (accounts) => {
+                    await connectWallet();
+                    renderTable([]); // Clear table immediately
+                    if (accounts.length === 0) {
+                        account = null;
+                        signer = null;
+                        provider = null;
+                        window.escrowContract = null;
+
+                        document.getElementById("walletAddress").innerText = "Not Connected";
+                        document.getElementById("connectBtn").innerText = "Connect Wallet";
+                        setConnectStatus("Disconnected");
+                        return;
+                    }
+
+                    await connectWallet();
+                });
+
+                window.ethereum.on("chainChanged", () => {
+                    window.location.reload();
+                });
+            }
+        </script>
+    </body>
+</html>
